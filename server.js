@@ -198,7 +198,7 @@ app.post('/api/tasks', async (req, res) => {
     return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบก่อนสั่งงาน' });
   }
 
-  const { title, bu, department, departments, priority, assignedTo, deadline, brief, referenceUrl, assetUrl } = req.body;
+  const { title, bu, department, departments, priority, assignedTo, assignedMembers, deadline, brief, referenceUrl, assetUrl } = req.body;
 
   const validDept = departments || department;
   if (!title || !bu || !validDept || (Array.isArray(validDept) && validDept.length === 0) || !assignedTo || !deadline) {
@@ -212,6 +212,7 @@ app.post('/api/tasks', async (req, res) => {
     departments,
     priority: priority || 'medium',
     assignedTo,
+    assignedMembers: assignedMembers || (assignedTo ? [assignedTo] : []),
     deadline,
     brief,
     referenceUrl,

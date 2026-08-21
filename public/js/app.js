@@ -1895,7 +1895,113 @@ class TaskHubApp {
     this.updateDeadlineValue(tomorrow);
     this.closeDeadlinePicker();
 
+    // Populate Dynamic Members in Department
+    this.handleNewTaskDeptChange();
+
     this.openModal('modal-new-task');
+  }
+
+  // 19.1 Dynamic Cascading Department & Member Selection Engine
+  handleNewTaskDeptChange() {
+    const checkedDeptNodes = document.querySelectorAll('input[name="task-dept-item"]:checked');
+    const checkedDepts = Array.from(checkedDeptNodes).map(cb => cb.value);
+    const container = document.getElementById('task-dept-members-container');
+    const assigneeSelect = document.getElementById('task-assignee');
+    if (!container) return;
+
+    if (checkedDepts.length === 0) {
+      container.innerHTML = `
+        <div class="p-3 rounded-xl bg-zinc-900/50 border border-dashed border-zinc-800 text-center text-xs text-zinc-500">
+          ⚠️ กรุณาคลิกเลือกแผนกที่เกี่ยวข้องในข้อ 1 ด้านบน เพื่อเลือกรายชื่อบุคคลที่รับผิดชอบ
+        </div>
+      `;
+      if (assigneeSelect) assigneeSelect.innerHTML = `<option value="">-- กรุณาเลือกแผนกก่อน --</option>`;
+      return;
+    }
+
+    const deptIcons = {
+      'กราฟิก': '🎨',
+      'วิดีโอ/ตัดต่อ': '✂️',
+      'คอนเทนต์': '✍️',
+      'การตลาด': '📢',
+      'แอดมิน': '💼',
+      'ผู้จัดการ/หัวหน้างาน': '👑'
+    };
+
+    let html = '';
+    const relevantUsers = [];
+
+    checkedDepts.forEach(dept => {
+      const deptUsers = this.users.filter(u => u.department === dept);
+      if (deptUsers.length === 0) return;
+
+      const icon = deptIcons[dept] || '📁';
+
+      html += `
+        <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-1.5">
+          <div class="flex items-center justify-between text-[11px] font-bold text-zinc-300">
+            <span class="flex items-center space-x-1.5">
+              <span>${icon}</span>
+              <span>แผนก${dept}</span>
+              <span class="text-zinc-500 text-[10px]">(${deptUsers.length} คน)</span>
+            </span>
+            <button type="button" onclick="app.toggleSelectAllInDept('${dept}')" class="text-[10px] text-[#ee2726] hover:underline font-normal">
+              เลือก/ยกเลิกทุกคน
+            </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            ${deptUsers.map(u => {
+              relevantUsers.push(u);
+              const buBadge = u.bu === 'bgn squad' ? '<span class="text-[8px] px-1.5 py-0.2 rounded bg-[#ee2726]/20 text-[#ff6b6b] border border-[#ee2726]/30 font-bold">🎬 squad</span>' : (u.bu === 'bgn square' ? '<span class="text-[8px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold">🛍️ square</span>' : '<span class="text-[8px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-bold">👑 รวม</span>');
+              return `
+                <label class="cursor-pointer flex items-center space-x-2 p-2 rounded-xl bg-zinc-950 border border-zinc-800/90 hover:border-zinc-700 transition-all has-[:checked]:bg-[#ee2726]/10 has-[:checked]:border-[#ee2726]/50">
+                  <input type="checkbox" name="task-member-item" data-dept="${dept}" value="${u.id}" onchange="app.handleNewTaskMemberChange()" checked class="w-4 h-4 rounded text-[#ee2726] focus:ring-0 bg-zinc-900 border-zinc-700">
+                  <img src="${u.avatar}" class="w-7 h-7 rounded-xl bg-zinc-900 object-cover flex-shrink-0 border border-zinc-800">
+                  <div class="truncate flex-1">
+                    <div class="text-xs font-bold text-zinc-200 truncate">${u.name}</div>
+                    <div class="text-[10px] text-zinc-400 flex items-center space-x-1">${buBadge}</div>
+                  </div>
+                </label>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    this.updateAssigneeDropdown(relevantUsers);
+  }
+
+  toggleSelectAllInDept(dept) {
+    const memberCbs = document.querySelectorAll(`input[name="task-member-item"][data-dept="${dept}"]`);
+    const allChecked = Array.from(memberCbs).every(cb => cb.checked);
+    memberCbs.forEach(cb => cb.checked = !allChecked);
+    this.handleNewTaskMemberChange();
+  }
+
+  handleNewTaskMemberChange() {
+    const checkedMemberIds = Array.from(document.querySelectorAll('input[name="task-member-item"]:checked')).map(cb => cb.value);
+    const relevantUsers = this.users.filter(u => checkedMemberIds.includes(u.id));
+    this.updateAssigneeDropdown(relevantUsers);
+  }
+
+  updateAssigneeDropdown(usersList) {
+    const select = document.getElementById('task-assignee');
+    if (!select) return;
+
+    const list = usersList && usersList.length > 0 ? usersList : this.users;
+    const currentVal = select.value;
+
+    select.innerHTML = list.map(u => `
+      <option value="${u.id}" ${u.id === currentVal ? 'selected' : ''}>
+        ${u.name} (${u.department})
+      </option>
+    `).join('');
+
+    if (!select.value && list.length > 0) {
+      select.value = list[0].id;
+    }
   }
 
   // Mini Calendar Dropdown Controls
@@ -2126,7 +2232,9 @@ class TaskHubApp {
       return;
     }
 
-    const assignedTo = document.getElementById('task-assignee').value;
+    const checkedMemberIds = Array.from(document.querySelectorAll('input[name="task-member-item"]:checked')).map(cb => cb.value);
+    const assignedTo = document.getElementById('task-assignee').value || (checkedMemberIds.length > 0 ? checkedMemberIds[0] : null);
+    
     const priority = document.getElementById('task-priority').value;
     const deadlineVal = document.getElementById('task-deadline').value || new Date().toISOString();
     const deadline = new Date(deadlineVal).toISOString();
@@ -2144,6 +2252,7 @@ class TaskHubApp {
           departments: checkedDepts,
           department: checkedDepts.join(', '),
           assignedTo,
+          assignedMembers: checkedMemberIds,
           priority,
           deadline,
           brief,
@@ -2183,6 +2292,17 @@ class TaskHubApp {
     const depts = Array.isArray(task.departments) ? task.departments : (task.department ? task.department.split(',').map(s => s.trim()) : []);
     const deptPills = depts.map(d => `<span class="px-2 py-0.5 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 font-bold mr-1 text-[11px]">${d}</span>`).join('');
 
+    const assignedMemberObjs = (task.assignedMembers && task.assignedMembers.length > 0)
+      ? this.users.filter(u => task.assignedMembers.includes(u.id))
+      : [assignee];
+
+    const assignedMembersPills = assignedMemberObjs.map(u => `
+      <span class="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-zinc-900 border border-zinc-800 mr-1">
+        <img src="${u.avatar}" class="w-4 h-4 rounded-full bg-zinc-800 object-cover">
+        <span class="text-zinc-200 font-bold text-[11px]">${u.name}</span>
+      </span>
+    `).join('');
+
     const header = document.getElementById('detail-header');
     if (header) {
       header.innerHTML = `
@@ -2200,10 +2320,10 @@ class TaskHubApp {
         </div>
 
         <h3 class="text-xl font-bold text-zinc-100 mb-2">${task.title}</h3>
-        <div class="flex flex-wrap items-center gap-4 text-xs text-zinc-400">
-          <div class="flex items-center space-x-1.5">
-            <img src="${assignee.avatar}" class="w-5 h-5 rounded-full bg-zinc-800 object-cover">
-            <span>ผู้รับผิดชอบ: <strong class="text-zinc-200">${assignee.name}</strong></span>
+        <div class="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs text-zinc-400">
+          <div class="flex items-center flex-wrap">
+            <span class="mr-1.5">ผู้รับผิดชอบ:</span>
+            ${assignedMembersPills}
           </div>
           <div>แผนกที่รับผิดชอบ: ${deptPills}</div>
           <div>ผู้สั่งงาน: <strong class="text-zinc-200">${assigner.name}</strong></div>
