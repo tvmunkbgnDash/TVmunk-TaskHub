@@ -30,6 +30,7 @@ class TaskHubApp {
     };
 
     this.calendarDate = new Date();
+    this.calendarBuFilter = 'all';
     this.selectedTaskId = null;
     this.selectedLeaveId = null;
     this.tempSelectedAvatar = null;
@@ -1632,7 +1633,47 @@ class TaskHubApp {
     }).join('');
   }
 
-  // 17. Calendar View Renderer
+  // 17. Calendar View Renderer (Color-Coded by Business Unit: squad 🔴 / square 🟣)
+  setCalendarBuFilter(bu) {
+    this.calendarBuFilter = bu || 'all';
+
+    // Update active filter chip buttons
+    const allBtn = document.getElementById('cal-filter-all');
+    const squadBtn = document.getElementById('cal-filter-squad');
+    const squareBtn = document.getElementById('cal-filter-square');
+
+    if (allBtn) {
+      if (this.calendarBuFilter === 'all') {
+        allBtn.className = 'px-2.5 py-1 rounded-xl text-[11px] font-bold bg-zinc-800 text-white border border-zinc-500 shadow-sm';
+      } else {
+        allBtn.className = 'px-2.5 py-1 rounded-xl text-[11px] font-bold bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200';
+      }
+    }
+
+    if (squadBtn) {
+      if (this.calendarBuFilter === 'bgn squad') {
+        squadBtn.className = 'px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#ee2726] text-white border border-red-400 shadow-md shadow-red-600/30 flex items-center space-x-1.5';
+      } else {
+        squadBtn.className = 'px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#ee2726]/15 text-[#ff6b6b] border border-[#ee2726]/40 hover:bg-[#ee2726]/25 flex items-center space-x-1.5';
+      }
+    }
+
+    if (squareBtn) {
+      if (this.calendarBuFilter === 'bgn square') {
+        squareBtn.className = 'px-2.5 py-1 rounded-xl text-[11px] font-bold bg-purple-600 text-white border border-purple-400 shadow-md shadow-purple-600/30 flex items-center space-x-1.5';
+      } else {
+        squareBtn.className = 'px-2.5 py-1 rounded-xl text-[11px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/40 hover:bg-purple-500/25 flex items-center space-x-1.5';
+      }
+    }
+
+    this.renderCalendar(this.getFilteredTasks());
+  }
+
+  currentMonthToday() {
+    this.calendarDate = new Date();
+    this.render();
+  }
+
   renderCalendar(tasks) {
     const grid = document.getElementById('calendar-grid');
     const headerTitle = document.getElementById('calendar-month-year');
@@ -1650,31 +1691,77 @@ class TaskHubApp {
     let cellsHtml = '';
 
     for (let i = 0; i < firstDay; i++) {
-      cellsHtml += `<div class="bg-zinc-950/40 p-2 min-h-[90px] opacity-20"></div>`;
+      cellsHtml += `<div class="bg-zinc-950/30 p-2 min-h-[105px] rounded-2xl border border-zinc-900/40 opacity-20"></div>`;
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
+
+    // Filter tasks by Calendar BU filter
+    let targetTasks = tasks;
+    if (this.calendarBuFilter && this.calendarBuFilter !== 'all') {
+      targetTasks = tasks.filter(t => t.bu === this.calendarBuFilter);
+    }
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(year, month, day);
       const dateStr = dateObj.toISOString().split('T')[0];
       const isToday = dateStr === todayStr;
 
-      const dayTasks = tasks.filter(t => t.deadline && t.deadline.startsWith(dateStr));
+      const dayTasks = targetTasks.filter(t => t.deadline && t.deadline.startsWith(dateStr));
+      const squadTasks = dayTasks.filter(t => t.bu === 'bgn squad');
+      const squareTasks = dayTasks.filter(t => t.bu === 'bgn square');
+
+      // Approved leaves on this date
+      const dayLeaves = (this.leaves || []).filter(l => 
+        l.status === 'approved' &&
+        l.startDate <= dateStr &&
+        l.endDate >= dateStr
+      );
 
       cellsHtml += `
-        <div class="bg-zinc-950 p-1.5 sm:p-2 min-h-[90px] flex flex-col justify-between border-t border-zinc-900 ${isToday ? 'ring-1 ring-[#ee2726] bg-[#ee2726]/10' : ''}">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-bold ${isToday ? 'w-5 h-5 rounded-full bg-[#ee2726] text-white flex items-center justify-center' : 'text-zinc-400'}">${day}</span>
-            ${dayTasks.length > 0 ? `<span class="text-[10px] font-bold text-[#ee2726]">${dayTasks.length} งาน</span>` : ''}
+        <div class="bg-zinc-950/80 p-2 min-h-[105px] flex flex-col justify-between rounded-2xl border ${isToday ? 'border-[#ee2726] bg-[#ee2726]/10 ring-1 ring-[#ee2726]/50' : 'border-zinc-800/80 hover:border-zinc-700'} transition-all">
+          
+          <!-- Day Header: Date number + BU task summary badges -->
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-bold ${isToday ? 'w-6 h-6 rounded-xl bg-[#ee2726] text-white flex items-center justify-center shadow-md shadow-red-600/40' : 'text-zinc-400'}">${day}</span>
+            <div class="flex items-center space-x-1">
+              ${squadTasks.length > 0 ? `<span class="px-1.5 py-0.2 rounded-md bg-[#ee2726]/20 text-[#ff6b6b] border border-[#ee2726]/40 text-[9px] font-bold" title="bgn squad (สื่อ)">🎬 ${squadTasks.length}</span>` : ''}
+              ${squareTasks.length > 0 ? `<span class="px-1.5 py-0.2 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[9px] font-bold" title="bgn square (ขายของ)">🛍️ ${squareTasks.length}</span>` : ''}
+            </div>
           </div>
-          <div class="space-y-1 overflow-y-auto max-h-16">
-            ${dayTasks.map(t => `
-              <div onclick="app.openTaskDetailModal('${t.id}')" title="${t.title}" class="p-1 rounded text-[10px] font-semibold bg-zinc-900 border border-zinc-800 text-zinc-200 truncate cursor-pointer hover:border-[#ee2726] transition-colors">
-                <span class="text-[#ee2726]">${t.code}</span> ${t.title}
+
+          <!-- Task & Leave Event Chips -->
+          <div class="space-y-1 overflow-y-auto max-h-24 pr-0.5 scrollbar-none">
+            
+            <!-- Tasks color-coded by BU -->
+            ${dayTasks.map(t => {
+              const isSquad = t.bu === 'bgn squad';
+              const chipBg = isSquad ? 'bg-[#ee2726]/15 hover:bg-[#ee2726]/25 border-[#ee2726]/40 hover:border-[#ee2726]' : 'bg-purple-950/60 hover:bg-purple-900/60 border-purple-500/40 hover:border-purple-400';
+              const badgeBg = isSquad ? 'bg-[#ee2726] text-white' : 'bg-purple-600 text-white';
+              const buIcon = isSquad ? '🎬' : '🛍️';
+              const buLabel = isSquad ? 'squad' : 'square';
+
+              return `
+                <div onclick="app.openTaskDetailModal('${t.id}')" title="[${t.bu}] ${t.code}: ${t.title}" class="p-1.5 rounded-xl text-[10px] font-semibold border ${chipBg} text-zinc-100 truncate cursor-pointer transition-all active:scale-95 shadow-sm group">
+                  <div class="flex items-center space-x-1 truncate">
+                    <span class="px-1 py-0.2 rounded ${badgeBg} text-[8px] font-black flex-shrink-0">${buIcon} ${buLabel}</span>
+                    <span class="truncate group-hover:text-white font-medium">${t.title}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+
+            <!-- Leaves on this day -->
+            ${dayLeaves.map(l => `
+              <div class="p-1 rounded-xl text-[9px] font-medium bg-amber-500/15 border border-amber-500/30 text-amber-200 truncate flex items-center space-x-1" title="ลางาน: ${l.userName} (${l.reason})">
+                <span class="flex-shrink-0">🏖️</span>
+                <span class="truncate font-bold">${l.userName}</span>
+                <span class="text-[8px] opacity-75 truncate">(${this.getLeaveTypeLabel(l.type)})</span>
               </div>
             `).join('')}
+
           </div>
+
         </div>
       `;
     }
