@@ -1,0 +1,218 @@
+/* Custom Minimalist Design for TVmunk - bgn Hub (CI Red & Pure White Theme) */
+
+:root {
+  --bgn-red: #ee2726;
+  --bgn-red-dark: #cc1b1a;
+  --bgn-red-glow: rgba(238, 39, 38, 0.25);
+  --bg-main: #09090b;
+  --bg-card: #121216;
+  --bg-card-hover: #18181d;
+  --border-color: #27272a;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: #f4f4f5;
+  font-family: 'Prompt', 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Active View Tab Button (Minimalist Red Glow) */
+.view-tab-btn {
+  color: #a1a1aa;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.view-tab-btn:hover {
+  color: #f4f4f5;
+}
+.view-tab-btn.active {
+  background: #1c1c22;
+  color: #ffffff;
+  border: 1px solid #3f3f46;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* BU Filter Chips */
+.bu-filter-chip {
+  background: #121216;
+  color: #a1a1aa;
+  border: 1px solid #27272a;
+  transition: all 0.2s ease;
+}
+.bu-filter-chip:hover {
+  color: #ffffff;
+  border-color: #3f3f46;
+  background: #18181d;
+}
+.bu-filter-chip.active {
+  background: #ffffff;
+  color: #09090b !important;
+  border-color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+}
+
+/* Kanban Cards (Minimalist sleek cards with subtle lift) */
+.kanban-card {
+  background: #121216;
+  border: 1px solid #27272a;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: grab;
+}
+.kanban-card:active {
+  cursor: grabbing;
+}
+.kanban-card:hover {
+  background: #16161b;
+  border-color: #3f3f46;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+/* CI Pill Style Badge (Like the squad capsule badge in bgn logo) */
+.ci-capsule-badge {
+  background: #ffffff;
+  color: #ee2726;
+  font-weight: 800;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* SortableJS Ghost & Dragging Styles */
+.sortable-ghost {
+  opacity: 0.25;
+  background: rgba(238, 39, 38, 0.08) !important;
+  border: 2px dashed #ee2726 !important;
+}
+.sortable-chosen {
+  background: #1c1c22;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6);
+}
+.sortable-drag {
+  opacity: 0.95;
+  transform: rotate(1deg);
+}
+
+/* Priority Indicator Badges */
+.priority-urgent {
+  background: rgba(238, 39, 38, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(238, 39, 38, 0.35);
+}
+.priority-high {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.priority-medium {
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.priority-low {
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Status Badges */
+.status-todo {
+  background: #1c1c22;
+  color: #a1a1aa;
+  border: 1px solid #27272a;
+}
+.status-in_progress {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.status-in_review {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+.status-revision {
+  background: rgba(238, 39, 38, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(238, 39, 38, 0.35);
+}
+.status-done {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Subtle glow animations for overdue or urgent tasks */
+@keyframes pulse-red-border {
+  0%, 100% { border-color: rgba(238, 39, 38, 0.6); }
+  50% { border-color: rgba(238, 39, 38, 0.2); }
+}
+.urgent-glow {
+  animation: pulse-red-border 2s infinite ease-in-out;
+}
+
+/* Glassmorphism Cards */
+.glass-panel {
+  background: rgba(18, 18, 22, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid #27272a;
+}
+
+/* Toast Animation */
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.toast-anim {
+  animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ================= PRINT STYLING FOR CONFIDENTIAL LEAVE & APPRAISAL REPORT ================= */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-appraisal-report, #print-appraisal-report * {
+    visibility: visible;
+  }
+  #print-appraisal-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    background: #ffffff !important;
+    color: #111827 !important;
+    display: block !important;
+  }
+  header, nav, #sub-header-filter, .mobile-bottom-nav, button, #toast-container, .modal {
+    display: none !important;
+  }
+}
