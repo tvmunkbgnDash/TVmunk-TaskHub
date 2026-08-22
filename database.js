@@ -1,6 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const { generateMeepleSvg } = require('./public/js/meepleAvatars');
+let pgPool = null;
+try {
+  const { Pool } = require('pg');
+  pgPool = Pool;
+} catch (e) {
+  // pg optional fallback
+}
 
 const DB_FILE = path.join(__dirname, 'data_store.json');
 
@@ -290,7 +297,61 @@ const initialData = {
 class Database {
   constructor() {
     this.data = null;
+    this.cloudPool = null;
     this.load();
+    this.initCloudDb();
+  }
+
+  initCloudDb() {
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl || !pgPool) return;
+
+    try {
+      this.cloudPool = new pgPool({
+        connectionString: dbUrl,
+        ssl: dbUrl.includes('localhost') ? false : { rejectUnauthorized: false }
+      });
+
+      this.cloudPool.query(`
+        CREATE TABLE IF NOT EXISTS app_store (
+          key VARCHAR(50) PRIMARY KEY,
+          data JSONB NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `).then(() => {
+        console.log('✅ [Cloud DB] Connected to PostgreSQL successfully!');
+        return this.cloudPool.query("SELECT data FROM app_store WHERE key = 'main'");
+      }).then(res => {
+        if (res.rows.length > 0 && res.rows[0].data) {
+          const cloudData = res.rows[0].data;
+          if (cloudData.tasks && Array.isArray(cloudData.tasks)) {
+            // Merge or adopt Cloud DB tasks safely
+            if (cloudData.tasks.length >= (this.data.tasks ? this.data.tasks.length : 0)) {
+              this.data = cloudData;
+              console.log(`📥 [Cloud DB] Synced ${this.data.tasks.length} tasks from Cloud Database!`);
+              this.saveLocal();
+            } else {
+              this.syncToCloudDb();
+            }
+          }
+        } else {
+          console.log('📤 [Cloud DB] Initializing fresh Cloud Database with local data...');
+          this.syncToCloudDb();
+        }
+      }).catch(err => {
+        console.warn('⚠️ [Cloud DB] Initialization notice:', err.message);
+      });
+    } catch (err) {
+      console.warn('⚠️ [Cloud DB] Connection error:', err.message);
+    }
+  }
+
+  syncToCloudDb() {
+    if (!this.cloudPool || !this.data) return;
+    this.cloudPool.query(
+      "INSERT INTO app_store (key, data, updated_at) VALUES ('main', $1, NOW()) ON CONFLICT (key) DO UPDATE SET data = $1, updated_at = NOW()",
+      [this.data]
+    ).catch(err => console.error('⚠️ [Cloud DB] Sync Error:', err.message));
   }
 
   load() {
@@ -357,7 +418,7 @@ class Database {
       });
 
       // Save valid data back to primary and backups immediately
-      this.save();
+      this.saveLocal();
     } else {
       console.warn('No database or backup found. Initializing new seed database...');
       this.resetToConfiguredSeed();
@@ -369,12 +430,9 @@ class Database {
     this.save();
   }
 
-  save() {
+  saveLocal() {
     try {
-      if (!this.data || typeof this.data !== 'object') {
-        console.error('Refusing to save invalid database object!');
-        return;
-      }
+      if (!this.data || typeof this.data !== 'object') return;
 
       const backupDir = path.join(__dirname, 'backups');
       if (!fs.existsSync(backupDir)) {
@@ -394,8 +452,13 @@ class Database {
         fs.writeFileSync(path.join(backupDir, 'data_store_stable.json'), jsonStr, { encoding: 'utf8', flag: 'w' });
       }
     } catch (err) {
-      console.error('Error saving database:', err);
+      console.error('Error saving database locally:', err);
     }
+  }
+
+  save() {
+    this.saveLocal();
+    this.syncToCloudDb();
   }
 
   getTasks() { return this.data.tasks; }
