@@ -109,9 +109,29 @@ class TaskHubApp {
       this.settings = data.settings || {};
       this.serverInfo = data.serverInfo || {};
 
+      // Mirror cache to local storage
+      localStorage.setItem('tvmunk_cached_bootstrap', JSON.stringify(data));
+
       this.populateLoginUserPresets();
     } catch (err) {
-      console.error('Error fetching bootstrap data:', err);
+      console.error('Error fetching bootstrap data, attempting local mirror cache:', err);
+      const cached = localStorage.getItem('tvmunk_cached_bootstrap');
+      if (cached) {
+        try {
+          const data = JSON.parse(cached);
+          this.users = data.users || [];
+          this.businessUnits = data.businessUnits || [];
+          this.departments = data.departments || [];
+          this.tasks = data.tasks || [];
+          this.leaves = data.leaves || [];
+          this.notifications = data.notifications || [];
+          this.channels = data.channels || this.channels;
+          this.settings = data.settings || {};
+          this.populateLoginUserPresets();
+          this.showToast('โหลดข้อมูลจากแคชในเครื่องเรียบร้อย ⚡', 'info');
+          return;
+        } catch (cErr) {}
+      }
       this.showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลจากเซิร์ฟเวอร์', 'error');
     }
   }
@@ -953,11 +973,15 @@ class TaskHubApp {
     const deptBadges = depts.map(d => `<span class="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700/60 font-medium">${d}</span>`).join(' ');
 
     const deadlineDate = new Date(task.deadline);
-    const isOverdue = deadlineDate < new Date() && task.status !== 'done';
-    const deadlineStr = deadlineDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+    const isOverdue = !isNaN(deadlineDate.getTime()) && deadlineDate < new Date() && task.status !== 'done';
+    const timeStr = !isNaN(deadlineDate.getTime()) ? `${String(deadlineDate.getHours()).padStart(2, '0')}:${String(deadlineDate.getMinutes()).padStart(2, '0')} น.` : '';
+    const deadlineStr = !isNaN(deadlineDate.getTime()) 
+      ? `${deadlineDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} ${timeStr}`
+      : '-';
 
     return `
       <div data-id="${task.id}" onclick="app.openTaskDetailModal('${task.id}')" class="kanban-card bg-[#121216] border ${isMyTask ? 'border-zinc-700 ring-1 ring-[#ee2726]/30' : 'border-zinc-800/80'} rounded-2xl p-3.5 shadow-md space-y-2.5 cursor-pointer group select-none">
+        
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-1.5">
             <span class="text-[11px] font-mono font-bold text-zinc-400 group-hover:text-white transition-colors">${task.code}</span>
@@ -1602,7 +1626,11 @@ class TaskHubApp {
 
     tbody.innerHTML = tasks.map(t => {
       const assignee = this.users.find(u => u.id === t.assignedTo) || { name: 'พี่วัฒน์ / พี่มิ้ว', avatar: '' };
-      const deadlineStr = new Date(t.deadline).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+      const d = new Date(t.deadline);
+      const timeStr = !isNaN(d.getTime()) ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : '';
+      const deadlineStr = !isNaN(d.getTime()) 
+        ? `${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })} ${timeStr} น.`
+        : '-';
       
       const depts = Array.isArray(t.departments) ? t.departments : (t.department ? t.department.split(',').map(s => s.trim()) : []);
       const deptPills = depts.map(d => `<span class="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 text-[10px] mr-1 inline-block">${d}</span>`).join('');
@@ -1706,7 +1734,8 @@ class TaskHubApp {
       cellsHtml += `<div class="bg-zinc-950/30 p-2 min-h-[105px] rounded-2xl border border-zinc-900/40 opacity-20"></div>`;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const pad = n => String(n).padStart(2, '0');
 
     // Filter tasks by Calendar BU filter
     let targetTasks = tasks;
@@ -1715,23 +1744,29 @@ class TaskHubApp {
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateObj = new Date(year, month, day);
-      const dateStr = dateObj.toISOString().split('T')[0];
-      const isToday = dateStr === todayStr;
+      const isToday = (today.getFullYear() === year && today.getMonth() === month && today.getDate() === day);
+      const localDateStr = `${year}-${pad(month + 1)}-${pad(day)}`;
 
-      const dayTasks = targetTasks.filter(t => t.deadline && t.deadline.startsWith(dateStr));
+      // Accurate Local Time Matching: Check if task deadline falls on this exact local day
+      const dayTasks = targetTasks.filter(t => {
+        if (!t.deadline) return false;
+        const d = new Date(t.deadline);
+        if (isNaN(d.getTime())) return false;
+        return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+      });
+
       const squadTasks = dayTasks.filter(t => t.bu === 'bgn squad');
       const squareTasks = dayTasks.filter(t => t.bu === 'bgn square');
 
       // Approved leaves on this date
       const dayLeaves = (this.leaves || []).filter(l => 
         l.status === 'approved' &&
-        l.startDate <= dateStr &&
-        l.endDate >= dateStr
+        l.startDate <= localDateStr &&
+        l.endDate >= localDateStr
       );
 
       cellsHtml += `
-        <div class="bg-zinc-950/80 p-2 min-h-[105px] flex flex-col justify-between rounded-2xl border ${isToday ? 'border-[#ee2726] bg-[#ee2726]/10 ring-1 ring-[#ee2726]/50' : 'border-zinc-800/80 hover:border-zinc-700'} transition-all">
+        <div class="bg-zinc-950/80 p-2 min-h-[110px] flex flex-col justify-between rounded-2xl border ${isToday ? 'border-[#ee2726] bg-[#ee2726]/10 ring-1 ring-[#ee2726]/50 shadow-lg shadow-red-950/30' : 'border-zinc-800/80 hover:border-zinc-700'} transition-all">
           
           <!-- Day Header: Date number + BU task summary badges -->
           <div class="flex items-center justify-between mb-1.5">
@@ -1743,20 +1778,25 @@ class TaskHubApp {
           </div>
 
           <!-- Task & Leave Event Chips -->
-          <div class="space-y-1 overflow-y-auto max-h-24 pr-0.5 scrollbar-none">
+          <div class="space-y-1 overflow-y-auto max-h-28 pr-0.5 scrollbar-none">
             
-            <!-- Tasks color-coded by BU -->
+            <!-- Tasks color-coded by BU with Exact Time -->
             ${dayTasks.map(t => {
               const isSquad = t.bu === 'bgn squad';
               const chipBg = isSquad ? 'bg-[#ee2726]/15 hover:bg-[#ee2726]/25 border-[#ee2726]/40 hover:border-[#ee2726]' : 'bg-purple-950/60 hover:bg-purple-900/60 border-purple-500/40 hover:border-purple-400';
               const badgeBg = isSquad ? 'bg-[#ee2726] text-white' : 'bg-purple-600 text-white';
               const buIcon = isSquad ? '🎬' : '🛍️';
               const buLabel = isSquad ? 'squad' : 'square';
+              
+              const dTime = new Date(t.deadline);
+              const timeStr = !isNaN(dTime.getTime()) ? `${pad(dTime.getHours())}:${pad(dTime.getMinutes())}` : '';
+              const deadlineFullStr = !isNaN(dTime.getTime()) ? dTime.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '';
 
               return `
-                <div onclick="app.openTaskDetailModal('${t.id}')" title="[${t.bu}] ${t.code}: ${t.title}" class="p-1.5 rounded-xl text-[10px] font-semibold border ${chipBg} text-zinc-100 truncate cursor-pointer transition-all active:scale-95 shadow-sm group">
+                <div onclick="app.openTaskDetailModal('${t.id}')" title="[${t.bu}] ${t.code}: ${t.title} (กำหนดส่ง: ${deadlineFullStr} น.)" class="p-1.5 rounded-xl text-[10px] font-semibold border ${chipBg} text-zinc-100 truncate cursor-pointer transition-all active:scale-95 shadow-sm group">
                   <div class="flex items-center space-x-1 truncate">
                     <span class="px-1 py-0.2 rounded ${badgeBg} text-[8px] font-black flex-shrink-0">${buIcon} ${buLabel}</span>
+                    ${timeStr ? `<span class="text-[9px] text-amber-300 font-mono flex-shrink-0">${timeStr} น.</span>` : ''}
                     <span class="truncate group-hover:text-white font-medium">${t.title}</span>
                   </div>
                 </div>
@@ -2299,7 +2339,10 @@ class TaskHubApp {
   renderTaskDetail(task) {
     const assignee = this.users.find(u => u.id === task.assignedTo) || { name: 'พี่วัฒน์ / พี่มิ้ว', avatar: '' };
     const assigner = this.users.find(u => u.id === task.assignedBy) || { name: 'หัวหน้างาน' };
-    const deadlineStr = new Date(task.deadline).toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'short' });
+    const d = new Date(task.deadline);
+    const deadlineStr = !isNaN(d.getTime())
+      ? `${d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })} เวลา ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} น.`
+      : '-';
 
     const depts = Array.isArray(task.departments) ? task.departments : (task.department ? task.department.split(',').map(s => s.trim()) : []);
     const deptPills = depts.map(d => `<span class="px-2 py-0.5 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 font-bold mr-1 text-[11px]">${d}</span>`).join('');
