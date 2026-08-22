@@ -264,8 +264,8 @@
       "department": "คอนเทนต์",
       "priority": "high",
       "status": "in_progress",
-      "assignedTo": "usr-1787238789267",
-      "assignedBy": "usr-1787238789267",
+      "assignedTo": "usr-pao",
+      "assignedBy": "usr-pao",
       "createdAt": "2026-08-21T05:43:37.669Z",
       "deadline": "2026-08-21T11:00:00.000Z",
       "brief": "ถ่ายให้โหน่ย",
@@ -320,6 +320,9 @@
           "details": "รับงานและเริ่มดำเนินการ (โดย พี่วัฒน์ (หัวหน้างาน) - ผู้จัดการ/หัวหน้างาน)",
           "timestamp": "2026-08-21T05:49:36.674Z"
         }
+      ],
+      "assignedMembers": [
+        "usr-pao"
       ]
     },
     {
@@ -335,7 +338,7 @@
       "department": "วิดีโอ/ตัดต่อ, คอนเทนต์, แอดมิน",
       "priority": "medium",
       "status": "in_progress",
-      "assignedTo": "usr-1787233874375",
+      "assignedTo": "usr-aon",
       "assignedBy": "usr-1",
       "createdAt": "2026-08-21T05:23:47.462Z",
       "deadline": "2026-08-27T11:00:00.000Z",
@@ -389,6 +392,9 @@
           "details": "รับงานและเริ่มดำเนินการ (โดย พี่วัฒน์ (หัวหน้างาน) - ผู้จัดการ/หัวหน้างาน)",
           "timestamp": "2026-08-21T05:33:38.600Z"
         }
+      ],
+      "assignedMembers": [
+        "usr-aon"
       ]
     }
   ],

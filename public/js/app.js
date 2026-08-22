@@ -840,18 +840,30 @@ class TaskHubApp {
 
   getFilteredTasks() {
     return this.tasks.filter(t => {
+      // My Tasks Only Filter: True if current user is direct assignee, or in assignedMembers, or is the creator
       if (this.filters.myTasksOnly && this.currentUser) {
-        if (t.assignedTo !== this.currentUser.id) return false;
+        const isDirect = t.assignedTo === this.currentUser.id;
+        const isMember = Array.isArray(t.assignedMembers) && t.assignedMembers.includes(this.currentUser.id);
+        const isCreator = t.assignedBy === this.currentUser.id;
+        if (!isDirect && !isMember && !isCreator) return false;
       }
+
       if (this.filters.bu !== 'all' && t.bu !== this.filters.bu) return false;
+
       if (this.filters.department !== 'all') {
         const depts = Array.isArray(t.departments) ? t.departments : (t.department ? t.department.split(',').map(s => s.trim()) : []);
         if (!depts.includes(this.filters.department)) return false;
       }
+
       if (this.filters.assignee === 'me' && this.currentUser) {
-        if (t.assignedTo !== this.currentUser.id) return false;
+        const isDirect = t.assignedTo === this.currentUser.id;
+        const isMember = Array.isArray(t.assignedMembers) && t.assignedMembers.includes(this.currentUser.id);
+        const isCreator = t.assignedBy === this.currentUser.id;
+        if (!isDirect && !isMember && !isCreator) return false;
       } else if (this.filters.assignee !== 'all') {
-        if (t.assignedTo !== this.filters.assignee) return false;
+        const isDirect = t.assignedTo === this.filters.assignee;
+        const isMember = Array.isArray(t.assignedMembers) && t.assignedMembers.includes(this.filters.assignee);
+        if (!isDirect && !isMember) return false;
       }
 
       if (this.filters.search) {

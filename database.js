@@ -294,6 +294,9 @@ class Database {
   }
 
   load() {
+    const backupDir = path.join(__dirname, 'backups');
+    const latestBackupPath = path.join(backupDir, 'data_store_latest_backup.json');
+
     try {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf8');
@@ -307,11 +310,26 @@ class Database {
             if (!u.username) u.username = u.name.toLowerCase().replace(/[^a-z0-9]/g, '') || `user${u.id.replace('usr-', '')}`;
           });
         }
+      } else if (fs.existsSync(latestBackupPath)) {
+        console.log('Restoring database from latest backup...');
+        const raw = fs.readFileSync(latestBackupPath, 'utf8');
+        this.data = JSON.parse(raw);
+        this.save();
       } else {
         this.resetToConfiguredSeed();
       }
     } catch (err) {
-      console.error('Error loading database, resetting:', err);
+      console.error('Error loading database, trying backup:', err);
+      if (fs.existsSync(latestBackupPath)) {
+        try {
+          const raw = fs.readFileSync(latestBackupPath, 'utf8');
+          this.data = JSON.parse(raw);
+          this.save();
+          return;
+        } catch (bErr) {
+          console.error('Error loading backup:', bErr);
+        }
+      }
       this.resetToConfiguredSeed();
     }
   }
@@ -323,9 +341,18 @@ class Database {
 
   save() {
     try {
+      const backupDir = path.join(__dirname, 'backups');
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+
+      const jsonStr = JSON.stringify(this.data, null, 2);
       const tempPath = `${DB_FILE}.tmp`;
-      fs.writeFileSync(tempPath, JSON.stringify(this.data, null, 2), 'utf8');
+      fs.writeFileSync(tempPath, jsonStr, 'utf8');
       fs.renameSync(tempPath, DB_FILE);
+
+      // Save latest backup
+      fs.writeFileSync(path.join(backupDir, 'data_store_latest_backup.json'), jsonStr, 'utf8');
     } catch (err) {
       console.error('Error saving database:', err);
     }
