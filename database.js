@@ -296,40 +296,70 @@ class Database {
   load() {
     const backupDir = path.join(__dirname, 'backups');
     const latestBackupPath = path.join(backupDir, 'data_store_latest_backup.json');
+    const stableBackupPath = path.join(backupDir, 'data_store_stable.json');
 
-    try {
-      if (fs.existsSync(DB_FILE)) {
-        const raw = fs.readFileSync(DB_FILE, 'utf8');
-        this.data = JSON.parse(raw);
-        if (!this.data.attendances) this.data.attendances = initialData.attendances;
-        if (!this.data.leaves) this.data.leaves = initialData.leaves;
-        if (!this.data.messages) this.data.messages = initialData.messages;
-        if (this.data.users) {
-          this.data.users.forEach(u => {
-            if (!u.pin) u.pin = '1234';
-            if (!u.username) u.username = u.name.toLowerCase().replace(/[^a-z0-9]/g, '') || `user${u.id.replace('usr-', '')}`;
-          });
+    const tryLoadFromPath = (filePath) => {
+      try {
+        if (!fs.existsSync(filePath)) return null;
+        const raw = fs.readFileSync(filePath, 'utf8');
+        if (!raw || raw.trim().length === 0) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.users)) {
+          return parsed;
         }
-      } else if (fs.existsSync(latestBackupPath)) {
-        console.log('Restoring database from latest backup...');
-        const raw = fs.readFileSync(latestBackupPath, 'utf8');
-        this.data = JSON.parse(raw);
-        this.save();
-      } else {
-        this.resetToConfiguredSeed();
+      } catch (e) {
+        console.error(`Failed to parse ${filePath}:`, e.message);
       }
-    } catch (err) {
-      console.error('Error loading database, trying backup:', err);
-      if (fs.existsSync(latestBackupPath)) {
-        try {
-          const raw = fs.readFileSync(latestBackupPath, 'utf8');
-          this.data = JSON.parse(raw);
-          this.save();
-          return;
-        } catch (bErr) {
-          console.error('Error loading backup:', bErr);
+      return null;
+    };
+
+    // 1. Try primary DB file
+    let loaded = tryLoadFromPath(DB_FILE);
+
+    // 2. If primary failed, try latest backup
+    if (!loaded) {
+      console.warn('⚠️ data_store.json was missing or corrupted. Attempting recovery from latest backup...');
+      loaded = tryLoadFromPath(latestBackupPath);
+    }
+
+    // 3. If latest backup failed, try stable backup
+    if (!loaded) {
+      console.warn('⚠️ latest backup failed. Attempting recovery from stable backup...');
+      loaded = tryLoadFromPath(stableBackupPath);
+    }
+
+    // 4. If all backups failed, find any valid snapshot in backups folder
+    if (!loaded && fs.existsSync(backupDir)) {
+      const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.json')).sort().reverse();
+      for (const file of files) {
+        loaded = tryLoadFromPath(path.join(backupDir, file));
+        if (loaded) {
+          console.log(`✅ Successfully recovered from historical snapshot: ${file}`);
+          break;
         }
       }
+    }
+
+    if (loaded) {
+      this.data = loaded;
+      if (!this.data.tasks) this.data.tasks = [];
+      if (!this.data.attendances) this.data.attendances = initialData.attendances;
+      if (!this.data.leaves) this.data.leaves = initialData.leaves;
+      if (!this.data.messages) this.data.messages = initialData.messages;
+      if (!this.data.notifications) this.data.notifications = [];
+      
+      // Ensure all 10 users exist
+      initialData.users.forEach(initU => {
+        const exists = this.data.users.find(u => u.id === initU.id || u.username === initU.username);
+        if (!exists) {
+          this.data.users.push(initU);
+        }
+      });
+
+      // Save valid data back to primary and backups immediately
+      this.save();
+    } else {
+      console.warn('No database or backup found. Initializing new seed database...');
       this.resetToConfiguredSeed();
     }
   }
@@ -341,18 +371,28 @@ class Database {
 
   save() {
     try {
+      if (!this.data || typeof this.data !== 'object') {
+        console.error('Refusing to save invalid database object!');
+        return;
+      }
+
       const backupDir = path.join(__dirname, 'backups');
       if (!fs.existsSync(backupDir)) {
         fs.mkdirSync(backupDir, { recursive: true });
       }
 
       const jsonStr = JSON.stringify(this.data, null, 2);
-      const tempPath = `${DB_FILE}.tmp`;
-      fs.writeFileSync(tempPath, jsonStr, 'utf8');
-      fs.renameSync(tempPath, DB_FILE);
+      
+      // 1. Direct synchronous write to primary file
+      fs.writeFileSync(DB_FILE, jsonStr, { encoding: 'utf8', flag: 'w' });
 
-      // Save latest backup
-      fs.writeFileSync(path.join(backupDir, 'data_store_latest_backup.json'), jsonStr, 'utf8');
+      // 2. Direct synchronous write to latest backup
+      fs.writeFileSync(path.join(backupDir, 'data_store_latest_backup.json'), jsonStr, { encoding: 'utf8', flag: 'w' });
+
+      // 3. Write to stable backup if valid tasks exist
+      if (Array.isArray(this.data.tasks) && this.data.tasks.length > 0) {
+        fs.writeFileSync(path.join(backupDir, 'data_store_stable.json'), jsonStr, { encoding: 'utf8', flag: 'w' });
+      }
     } catch (err) {
       console.error('Error saving database:', err);
     }

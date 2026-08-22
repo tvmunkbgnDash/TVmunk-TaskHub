@@ -400,6 +400,17 @@
   ],
   "notifications": [
     {
+      "id": "notif-1787375740576-f1gj0",
+      "type": "new_task",
+      "title": "📥 มีการสั่งงานใหม่!",
+      "message": "พี่วัฒน์ (หัวหน้างาน) ได้สั่งงาน: \"งานทดสอบความปลอดภัยถาวร (Indestructible Test)\" [bgn square] แผนก: การตลาด",
+      "taskId": "task-1787375740575",
+      "targetUserId": "usr-mook",
+      "targetRole": "member",
+      "isRead": false,
+      "createdAt": "2026-08-22T05:15:40.576Z"
+    },
+    {
       "id": "notif-1787337504456-k57uw",
       "type": "new_task",
       "title": "📥 มีการสั่งงานใหม่!",
